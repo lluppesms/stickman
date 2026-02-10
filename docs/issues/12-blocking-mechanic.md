@@ -10,13 +10,13 @@ Gameplay, Units
 Add a blocking mechanic for specific unit types, allowing them to reduce incoming damage by blocking attacks.
 
 ## Blocking Units
-- **Spearman** - Medium block effectiveness
-- **Giant** - High block effectiveness
+- **Spearman** - Medium block effectiveness (e.g., 30% damage reduction)
+- **Giant** - High block effectiveness (e.g., 50% damage reduction)
 - Potentially other defensive unit types
 
 ## Acceptance Criteria
 - [ ] Designated units can block attacks
-- [ ] Blocking reduces damage by a percentage (e.g., 30-50%)
+- [ ] Blocking reduces damage based on unit type (30-50% range across different units)
 - [ ] Visual indicator when unit is blocking (shield effect, animation)
 - [ ] Block mechanic has cooldown or stamina system to prevent constant blocking
 - [ ] AI enemies also use blocking when appropriate

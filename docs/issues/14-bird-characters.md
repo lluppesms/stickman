@@ -12,7 +12,7 @@ Add special bird-themed character units that unlock after players complete certa
 ## Acceptance Criteria
 - [ ] Design unique bird-based units with distinct abilities
 - [ ] Bird characters have special abilities that differentiate them from regular units
-- [ ] Unlock condition is clearly defined (after completing levels 1-4 or beating level 8)
+- [ ] Unlock condition is clearly defined (requires clarification - see Questions section)
 - [ ] Visual distinction from regular units (bird sprites/appearance)
 - [ ] Bird units are balanced with existing units
 - [ ] Unlock notification/celebration when birds become available

@@ -38,3 +38,14 @@ Create an age progression system where players advance through 4 distinct histor
 
 ## Estimated Effort
 Very Large (16-24 hours)
+
+Note: Wide estimate range due to:
+- Uncertainty in whether age progression requires completely new unit types or can reuse existing units with visual changes
+- Scale of visual asset creation needed (4 full sets vs. themed variants)
+- Complexity of progression logic and state management
+- Potential need for rebalancing entire game economy across ages
+
+Consider breaking into sub-tasks:
+1. Design and implement age progression system (4-6 hours)
+2. Create age-specific units and balance (8-12 hours)
+3. Implement age-specific visuals and UI (4-6 hours)
