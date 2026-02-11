@@ -29,40 +29,40 @@ The V2 features were implemented in the following order, which proved effective:
 ### Phase 1: Core Mechanics (High Priority)
 Foundation features that enabled the game to function:
 
-1. **[Issue 3: Longer Arena with Camera](issues_v2/03-longer-arena-camera.md)** ✅ Implemented
+1. **[Issue 3: Longer Arena with Camera](create_issues/issues_v2/03-longer-arena-camera.md)** ✅ Implemented
    - Extended arena to 3072px
    - Added arrow key camera controls
    - Essential foundation for larger battles
    - **Lesson**: Implementing this first allowed proper testing of all subsequent features
 
-2. **[Issue 2: Multiple Character Types](issues_v2/02-more-characters.md)** ✅ Implemented
+2. **[Issue 2: Multiple Character Types](create_issues/issues_v2/02-more-characters.md)** ✅ Implemented
    - Created 4 unit types: Archer, Warrior, Spearman, Giant
    - Different stats (HP, damage, speed) per type
    - **Lesson**: This created the strategic depth needed for engaging gameplay
 
-3. **[Issue 7: Different Character Costs](issues_v2/07-character-costs.md)** ✅ Implemented
+3. **[Issue 7: Different Character Costs](create_issues/issues_v2/07-character-costs.md)** ✅ Implemented
    - Archer (25g), Warrior (50g), Spearman (75g), Giant (150g)
    - **Lesson**: Must be implemented alongside multiple characters for balance
 
 ### Phase 2: Economy & Balance (Medium Priority)
 Fine-tuning the gameplay experience:
 
-4. **[Issue 6: Reduce Gold Spawn Rate](issues_v2/06-reduce-gold-spawn.md)** ✅ Implemented
+4. **[Issue 6: Reduce Gold Spawn Rate](create_issues/issues_v2/06-reduce-gold-spawn.md)** ✅ Implemented
    - Balanced passive gold generation with kill rewards
    - **Lesson**: Critical for preventing unit spam and forcing strategic decisions
 
-5. **[Issue 4: Slower Characters](issues_v2/04-slower-characters.md)** ✅ Implemented
+5. **[Issue 4: Slower Characters](create_issues/issues_v2/04-slower-characters.md)** ✅ Implemented
    - Balanced unit speeds (30-60 range)
    - **Lesson**: Slower movement improved visibility of combat and strategic thinking time
 
 ### Phase 3: Polish & Enhancement (Medium Priority)
 Visual and audio improvements:
 
-6. **[Issue 5: Cartoony Design](issues_v2/05-cartoony-design.md)** ✅ Implemented
+6. **[Issue 5: Cartoony Design](create_issues/issues_v2/05-cartoony-design.md)** ✅ Implemented
    - Procedural stickman sprites with cartoony style
    - **Lesson**: Visual identity greatly improved player engagement
 
-7. **[Issue 1: Background Music](issues_v2/01-background-music.md)** ✅ Implemented
+7. **[Issue 1: Background Music](create_issues/issues_v2/01-background-music.md)** ✅ Implemented
    - Background music with mute toggle
    - **Lesson**: Audio adds significant atmosphere; implement mute control from the start
 
@@ -115,22 +115,22 @@ This section outlines the roadmap for implementing V3 features, building on V2's
 ### Phase 1: Core Enhancements (High Priority)
 Start with these foundational improvements that significantly impact gameplay:
 
-1. **[Issue 7: Difficulty Levels](issues/07-difficulty-levels.md)** (2-4 hours)
+1. **[Issue 7: Difficulty Levels](create_issues/issues_v3/07-difficulty-levels.md)** (2-4 hours)
    - Quickest win with immediate impact
    - Provides replayability and accessibility
    - No dependencies
 
-2. **[Issue 1: Sound Effects](issues/01-sound-effects.md)** (3-5 hours)
+2. **[Issue 1: Sound Effects](create_issues/issues_v3/01-sound-effects.md)** (3-5 hours)
    - Greatly enhances game feel
    - Independent from other features
    - Leverages existing SoundFX.js
 
-3. **[Issue 2: Animations](issues/02-animations.md)** (8-12 hours)
+3. **[Issue 2: Animations](create_issues/issues_v3/02-animations.md)** (8-12 hours)
    - Major visual improvement
    - Foundation for future visual enhancements
    - Consider before implementing age progression
 
-4. **[Issue 5: Age Progression](issues/05-age-progression.md)** (16-24 hours)
+4. **[Issue 5: Age Progression](create_issues/issues_v3/05-age-progression.md)** (16-24 hours)
    - Largest feature, affects many others
    - Core theme for V3
    - Implement after animations are working
@@ -138,38 +138,38 @@ Start with these foundational improvements that significantly impact gameplay:
 ### Phase 2: Visual Polish (Medium Priority)
 Enhance visuals and aesthetics:
 
-5. **[Issue 3: Background Graphics](issues/03-background-graphics.md)** (4-6 hours)
+5. **[Issue 3: Background Graphics](create_issues/issues_v3/03-background-graphics.md)** (4-6 hours)
    - Should align with age themes from Issue 5
    
-6. **[Issue 6: Age-Specific Buildings](issues/06-age-specific-buildings.md)** (5-7 hours)
+6. **[Issue 6: Age-Specific Buildings](create_issues/issues_v3/06-age-specific-buildings.md)** (5-7 hours)
    - Requires Issue 5 to be complete
 
-7. **[Issue 13: Damage Numbers](issues/13-damage-numbers.md)** (2-4 hours)
+7. **[Issue 13: Damage Numbers](create_issues/issues_v3/13-damage-numbers.md)** (2-4 hours)
    - Quick improvement to game feel
    - Good break between larger features
 
 ### Phase 3: Progression Systems (Medium Priority)
 Build out meta-game and progression:
 
-8. **[Issue 11: Shop System](issues/11-shop-system.md)** (6-8 hours)
+8. **[Issue 11: Shop System](create_issues/issues_v3/11-shop-system.md)** (6-8 hours)
    - Foundation for persistent progression
    - Required for Issue 8
 
-9. **[Issue 8: Song Selection](issues/08-song-selection-system.md)** (5-7 hours)
+9. **[Issue 8: Song Selection](create_issues/issues_v3/08-song-selection-system.md)** (5-7 hours)
    - Integrates with shop system
 
 ### Phase 4: Polish & Extras (Low Priority)
 Nice-to-have features for completeness:
 
-10. **[Issue 10: Weather Conditions](issues/10-weather-conditions.md)** (4-6 hours)
-11. **[Issue 12: Blocking Mechanic](issues/12-blocking-mechanic.md)** (4-5 hours)
-12. **[Issue 14: Bird Characters](issues/14-bird-characters.md)** (5-7 hours)
-13. **[Issue 9: Better Game Title](issues/09-better-game-title.md)** (1-2 hours)
+10. **[Issue 10: Weather Conditions](create_issues/issues_v3/10-weather-conditions.md)** (4-6 hours)
+11. **[Issue 12: Blocking Mechanic](create_issues/issues_v3/12-blocking-mechanic.md)** (4-5 hours)
+12. **[Issue 14: Bird Characters](create_issues/issues_v3/14-bird-characters.md)** (5-7 hours)
+13. **[Issue 9: Better Game Title](create_issues/issues_v3/09-better-game-title.md)** (1-2 hours)
 
 ### Phase 5: Experimental
 Features requiring further clarification:
 
-14. **[Issue 4: Marble Simulator](issues/04-marble-simulator.md)** (Unknown)
+14. **[Issue 4: Marble Simulator](create_issues/issues_v3/04-marble-simulator.md)** (Unknown)
     - Needs design clarification before implementation
 
 ## V3 Total Estimated Effort
@@ -292,4 +292,4 @@ V3 (Full-Featured Game) 🎯
 
 ---
 
-**Ready to start V3?** Begin with [Issue 7: Difficulty Levels](issues/07-difficulty-levels.md) for a quick win that builds on V2's foundation!
+**Ready to start V3?** Begin with [Issue 7: Difficulty Levels](create_issues/issues_v3/07-difficulty-levels.md) for a quick win that builds on V2's foundation!
