@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import { SoundFX } from './SoundFX.js';
 import { DIFFICULTIES } from './MenuScene.js';
+import { AGES } from './AgesConfig.js';
+import { loadProgress, saveProgress } from './LevelSelectScene.js';
 
 const GROUND_Y = 500;
 const GAME_W = 3072;
@@ -45,40 +47,78 @@ export class GameScene extends Phaser.Scene {
     const diffKey = (data && data.difficulty) || 'medium';
     this.difficulty = DIFFICULTIES[diffKey] || DIFFICULTIES.medium;
 
+    // ── Age config ──────────────────────────────────────────
+    this.ageIndex = (data && data.ageIndex != null) ? data.ageIndex : 0;
+    this.ageConfig = AGES[this.ageIndex] || AGES[0];
+
+    // Build unitTypes from base UNIT_TYPES + age overrides
+    const ageUnits = this.ageConfig.units;
+    this.unitTypes = UNIT_TYPES.map((base) => {
+      const ageUnit = ageUnits[base.name] || {};
+      return {
+        ...base,
+        displayName: ageUnit.displayName || base.name,
+        color: ageUnit.playerColor || base.color,
+        enemyColor: ageUnit.enemyColor || 0xff4444,
+        hp: Math.round(base.hp * this.ageConfig.statMult),
+        damage: Math.round(base.damage * this.ageConfig.statMult),
+      };
+    });
+
+    // Base HP from age config
+    this.maxPlayerBaseHP = BASE_HP;
+    this.maxEnemyBaseHP = this.ageConfig.enemyBaseHP;
+
+    this.cleanupTextures();
     this.generateStickmanTextures();
+    this.generateBaseTextures();
     this.drawBackground();
 
     // ── Ground ──────────────────────────────────────────────
-    const ground = this.add.rectangle(GAME_W / 2, GROUND_Y + 40, GAME_W, 80, 0x3d8b37).setDepth(5);
+    const ground = this.add.rectangle(GAME_W / 2, GROUND_Y + 40, GAME_W, 80, this.ageConfig.background.groundColor).setDepth(5);
     this.physics.add.existing(ground, true); // static body
     this.ground = ground;
 
     // ── Bases ───────────────────────────────────────────────
-    this.playerBaseHP = BASE_HP;
-    this.enemyBaseHP = BASE_HP;
+    this.playerBaseHP = this.maxPlayerBaseHP;
+    this.enemyBaseHP = this.maxEnemyBaseHP;
 
-    // Player base (left)
-    this.playerBase = this.add.rectangle(60, GROUND_Y - 60, 80, 120, 0x4444cc).setDepth(10);
+    // Player base (left) — sprite with invisible physics body
+    this.playerBaseStage = 0;
+    this.playerBase = this.add.sprite(60, GROUND_Y - 70, 'base_player_0').setDepth(10);
     this.playerBase.faction = 'player';
-    this.playerBase.unitHeight = 120;
-    this.physics.add.existing(this.playerBase, true);
-    this.playerBaseLabel = this.add.text(20, GROUND_Y - 140, 'Your Base', {
+    this.playerBase.unitHeight = 140;
+    const playerBaseBody = this.add.rectangle(60, GROUND_Y - 60, 80, 120).setAlpha(0).setDepth(10);
+    playerBaseBody.faction = 'player';
+    playerBaseBody.unitHeight = 120;
+    this.physics.add.existing(playerBaseBody, true);
+    this.playerBasePhysics = playerBaseBody;
+    this.playerBaseLabel = this.add.text(20, GROUND_Y - 155, 'Your Base', {
       fontSize: '13px', color: '#ffffff',
+      stroke: '#000000', strokeThickness: 2,
     }).setDepth(10);
-    this.playerHPText = this.add.text(20, GROUND_Y - 125, `HP: ${this.playerBaseHP}`, {
+    this.playerHPText = this.add.text(20, GROUND_Y - 140, `HP: ${this.playerBaseHP}`, {
       fontSize: '12px', color: '#ffffff',
+      stroke: '#000000', strokeThickness: 2,
     }).setDepth(10);
 
-    // Enemy base (right)
-    this.enemyBase = this.add.rectangle(GAME_W - 60, GROUND_Y - 60, 80, 120, 0xcc4444).setDepth(10);
+    // Enemy base (right) — sprite with invisible physics body
+    this.enemyBaseStage = 0;
+    this.enemyBase = this.add.sprite(GAME_W - 60, GROUND_Y - 70, 'base_enemy_0').setDepth(10);
     this.enemyBase.faction = 'enemy';
-    this.enemyBase.unitHeight = 120;
-    this.physics.add.existing(this.enemyBase, true);
-    this.enemyBaseLabel = this.add.text(GAME_W - 110, GROUND_Y - 140, 'Enemy Base', {
+    this.enemyBase.unitHeight = 140;
+    const enemyBaseBody = this.add.rectangle(GAME_W - 60, GROUND_Y - 60, 80, 120).setAlpha(0).setDepth(10);
+    enemyBaseBody.faction = 'enemy';
+    enemyBaseBody.unitHeight = 120;
+    this.physics.add.existing(enemyBaseBody, true);
+    this.enemyBasePhysics = enemyBaseBody;
+    this.enemyBaseLabel = this.add.text(GAME_W - 110, GROUND_Y - 155, 'Enemy Base', {
       fontSize: '13px', color: '#ffffff',
+      stroke: '#000000', strokeThickness: 2,
     }).setDepth(10);
-    this.enemyHPText = this.add.text(GAME_W - 110, GROUND_Y - 125, `HP: ${this.enemyBaseHP}`, {
+    this.enemyHPText = this.add.text(GAME_W - 110, GROUND_Y - 140, `HP: ${this.enemyBaseHP}`, {
       fontSize: '12px', color: '#ffffff',
+      stroke: '#000000', strokeThickness: 2,
     }).setDepth(10);
 
     // ── Gold ────────────────────────────────────────────────
@@ -102,10 +142,10 @@ export class GameScene extends Phaser.Scene {
     const btnStartX = 130;
     const btnW = 160;
     const btnGap = 8;
-    UNIT_TYPES.forEach((type, i) => {
+    this.unitTypes.forEach((type, i) => {
       const x = btnStartX + i * (btnW + btnGap);
       const btn = this.add.rectangle(x, 20, btnW, 36, 0x226622, 0.9).setOrigin(0, 0).setScrollFactor(0).setDepth(20);
-      const label = this.add.text(x + 8, 26, `${type.name} (${type.cost}g)`, {
+      const label = this.add.text(x + 8, 26, `${type.displayName} (${type.cost}g)`, {
         fontSize: '14px', color: '#ffffff',
       }).setScrollFactor(0).setDepth(20);
       btn.setInteractive({ useHandCursor: true });
@@ -152,6 +192,27 @@ export class GameScene extends Phaser.Scene {
       this.muteBtn.setText(this.sound.mute ? '♪X' : '♪');
     });
 
+    // ── Quit button (top-right) ─────────────────────────────────
+    this.quitConfirm = false;
+    const quitBtnBg = this.add.rectangle(1024 - 40, 48, 36, 22, 0x663333, 0.9)
+      .setScrollFactor(0).setDepth(20).setInteractive({ useHandCursor: true });
+    this.quitBtnText = this.add.text(1024 - 40, 48, 'Quit', {
+      fontSize: '11px', color: '#ff8888', fontStyle: 'bold',
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(20);
+    quitBtnBg.on('pointerdown', () => {
+      if (this.quitConfirm) {
+        if (this.music) this.music.stop();
+        this.scene.start('LevelSelectScene');
+      } else {
+        this.quitConfirm = true;
+        this.quitBtnText.setText('Sure?');
+        this.time.delayedCall(2000, () => {
+          this.quitConfirm = false;
+          if (this.quitBtnText.active) this.quitBtnText.setText('Quit');
+        });
+      }
+    });
+
     // ── Shop button (top-right, left of mute) ─────────────────
     const shopBtnBg = this.add.rectangle(1024 - 100, 28, 50, 28, 0x886600, 0.9)
       .setScrollFactor(0).setDepth(20).setInteractive({ useHandCursor: true });
@@ -160,11 +221,11 @@ export class GameScene extends Phaser.Scene {
     }).setOrigin(0.5).setScrollFactor(0).setDepth(20);
     shopBtnBg.on('pointerdown', () => this.toggleShop());
 
-    // ── Difficulty label (HUD) ────────────────────────────────
-    this.add.text(1024 - 80, 48, this.difficulty.label, {
-      fontSize: '14px', color: '#ffffff',
+    // ── Age name + Difficulty label (HUD) ────────────────────
+    this.add.text(16, 72, `${this.ageConfig.name} - ${this.difficulty.label}`, {
+      fontSize: '13px', color: '#ffffff',
       stroke: '#000000', strokeThickness: 2,
-    }).setScrollFactor(0).setDepth(20).setOrigin(0.5, 0);
+    }).setScrollFactor(0).setDepth(20);
 
     // ── Sound effects ─────────────────────────────────────────
     this.sfx = new SoundFX(() => this.sound.mute);
@@ -209,12 +270,12 @@ export class GameScene extends Phaser.Scene {
     const vpW = (1024 / GAME_W) * mmW;
     this.minimapVP = this.add.rectangle(mmX + vpW / 2, mmY + mmH / 2, vpW, mmH - 2, 0xffffff, 0.3)
       .setScrollFactor(0).setDepth(21);
-    // Base markers
+    // Base markers — use age colors
     const basePlayerX = mmX + (60 / GAME_W) * mmW;
     const baseEnemyX = mmX + ((GAME_W - 60) / GAME_W) * mmW;
-    this.add.rectangle(basePlayerX, mmY + mmH / 2, 4, mmH - 4, 0x4444cc)
+    this.add.rectangle(basePlayerX, mmY + mmH / 2, 4, mmH - 4, this.ageConfig.baseColors.player)
       .setScrollFactor(0).setDepth(22);
-    this.add.rectangle(baseEnemyX, mmY + mmH / 2, 4, mmH - 4, 0xcc4444)
+    this.add.rectangle(baseEnemyX, mmY + mmH / 2, 4, mmH - 4, this.ageConfig.baseColors.enemy)
       .setScrollFactor(0).setDepth(22);
     // Graphics layer for unit dots
     this.minimapGfx = this.add.graphics().setScrollFactor(0).setDepth(22);
@@ -238,12 +299,45 @@ export class GameScene extends Phaser.Scene {
     this.setupWeather();
 
     // Weather HUD label
-    const weatherIcons = { sunny: '\u2600', rain: '\u{1F327}', snow: '\u2744', fog: '\u{1F32B}', thunderstorm: '\u26A1' };
+    const weatherIcons = { sunny: '\u2600', rain: '\u2602', snow: '\u2744', fog: '~', thunderstorm: '\u26A1' };
     const weatherIcon = weatherIcons[this.weather.id] || '';
     this.weatherText = this.add.text(16, 56, `${weatherIcon} ${this.weather.name}`, {
       fontSize: '13px', color: '#dddddd',
       stroke: '#000000', strokeThickness: 2,
     }).setScrollFactor(0).setDepth(20);
+  }
+
+  // ── Cleanup textures/anims for age switching ────────────────
+  cleanupTextures() {
+    const poses = ['idle', 'walk_0', 'walk_1', 'attack_0', 'attack_1'];
+    UNIT_TYPES.forEach((type) => {
+      ['player', 'enemy'].forEach((faction) => {
+        // Remove animations
+        const walkKey = animKey(type.name, faction, 'walk');
+        const attackKey = animKey(type.name, faction, 'attack');
+        if (this.anims.exists(walkKey)) this.anims.remove(walkKey);
+        if (this.anims.exists(attackKey)) this.anims.remove(attackKey);
+
+        // Remove textures
+        poses.forEach((pose) => {
+          const key = textureKey(type.name, faction, pose);
+          if (this.textures.exists(key)) this.textures.remove(key);
+        });
+      });
+    });
+
+    // Remove background textures
+    ['bg_sky', 'bg_clouds', 'bg_far_mtn', 'bg_near_mtn', 'bg_trees', 'shield_icon', 'rain_drop', 'snowflake'].forEach((key) => {
+      if (this.textures.exists(key)) this.textures.remove(key);
+    });
+
+    // Remove base textures
+    ['player', 'enemy'].forEach((faction) => {
+      for (let dmg = 0; dmg < 3; dmg++) {
+        const key = `base_${faction}_${dmg}`;
+        if (this.textures.exists(key)) this.textures.remove(key);
+      }
+    });
   }
 
   // ── Texture generation ─────────────────────────────────────
@@ -257,13 +351,13 @@ export class GameScene extends Phaser.Scene {
 
     const poses = ['idle', 'walk_0', 'walk_1', 'attack_0', 'attack_1'];
 
-    UNIT_TYPES.forEach((type) => {
+    this.unitTypes.forEach((type) => {
       const texW = type.width + 16;
       const texH = type.height + 4;
 
       [
         { faction: 'player', color: type.color },
-        { faction: 'enemy', color: 0xff4444 },
+        { faction: 'enemy', color: type.enemyColor },
       ].forEach(({ faction, color }) => {
         const drawFn = drawFns[type.name];
         if (!drawFn) return;
@@ -289,7 +383,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   createAnimations() {
-    UNIT_TYPES.forEach((type) => {
+    this.unitTypes.forEach((type) => {
       ['player', 'enemy'].forEach((faction) => {
         // Walk animation — 2 frames at 4 fps
         this.anims.create({
@@ -316,10 +410,445 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  // ── Base texture generation ──────────────────────────────
+  generateBaseTextures() {
+    const w = 100;
+    const h = 140;
+    const style = this.ageConfig.baseStyle;
+    const drawFns = {
+      cave: this.drawCaveBase,
+      castle: this.drawCastleBase,
+      bunker: this.drawBunkerBase,
+      scifi: this.drawScifiBase,
+    };
+    const drawFn = drawFns[style] || drawFns.cave;
+
+    ['player', 'enemy'].forEach((faction) => {
+      const color = this.ageConfig.baseColors[faction];
+      for (let dmg = 0; dmg < 3; dmg++) {
+        const g = this.add.graphics();
+        drawFn(g, w, h, color, dmg);
+        g.generateTexture(`base_${faction}_${dmg}`, w, h);
+        g.destroy();
+      }
+    });
+  }
+
+  drawCaveBase(g, w, h, color, damageLevel) {
+    const baseY = h;
+    const darkerColor = Phaser.Display.Color.ValueToColor(color).darken(20).color;
+    const lighterColor = Phaser.Display.Color.ValueToColor(color).lighten(15).color;
+
+    // Main rock mound shape
+    g.fillStyle(color, 1);
+    g.beginPath();
+    g.moveTo(5, baseY);
+    g.lineTo(8, baseY - 60);
+    g.lineTo(15, baseY - 90);
+    g.lineTo(25, baseY - 110);
+    g.lineTo(35, baseY - 125);
+    g.lineTo(50, baseY - 135);
+    g.lineTo(65, baseY - 125);
+    g.lineTo(75, baseY - 110);
+    g.lineTo(85, baseY - 90);
+    g.lineTo(92, baseY - 60);
+    g.lineTo(95, baseY);
+    g.closePath();
+    g.fillPath();
+
+    // Rock texture lines
+    g.lineStyle(1, darkerColor, 0.6);
+    g.beginPath();
+    g.moveTo(20, baseY - 100);
+    g.lineTo(40, baseY - 95);
+    g.strokePath();
+    g.beginPath();
+    g.moveTo(55, baseY - 110);
+    g.lineTo(75, baseY - 95);
+    g.strokePath();
+    g.beginPath();
+    g.moveTo(15, baseY - 70);
+    g.lineTo(35, baseY - 65);
+    g.strokePath();
+
+    // Cave arch opening
+    g.fillStyle(0x111111, 1);
+    g.beginPath();
+    g.moveTo(30, baseY);
+    g.lineTo(30, baseY - 40);
+    g.arc(50, baseY - 40, 20, Math.PI, 0, false);
+    g.lineTo(70, baseY);
+    g.closePath();
+    g.fillPath();
+
+    // Arch outline
+    g.lineStyle(2, lighterColor, 0.8);
+    g.beginPath();
+    g.moveTo(30, baseY);
+    g.lineTo(30, baseY - 40);
+    g.arc(50, baseY - 40, 20, Math.PI, 0, false);
+    g.lineTo(70, baseY);
+    g.strokePath();
+
+    // Boulder at entrance
+    g.fillStyle(darkerColor, 0.8);
+    g.fillCircle(35, baseY - 5, 6);
+
+    if (damageLevel >= 1) {
+      // Cracks
+      g.lineStyle(2, 0x222222, 0.7);
+      g.beginPath();
+      g.moveTo(60, baseY - 120);
+      g.lineTo(55, baseY - 100);
+      g.lineTo(62, baseY - 85);
+      g.strokePath();
+      g.beginPath();
+      g.moveTo(25, baseY - 95);
+      g.lineTo(30, baseY - 80);
+      g.strokePath();
+      // Missing chunk from top
+      g.fillStyle(0x000000, 0.15);
+      g.fillTriangle(45, baseY - 135, 55, baseY - 135, 50, baseY - 120);
+    }
+
+    if (damageLevel >= 2) {
+      // More cracks
+      g.lineStyle(2, 0x222222, 0.8);
+      g.beginPath();
+      g.moveTo(35, baseY - 110);
+      g.lineTo(40, baseY - 90);
+      g.lineTo(35, baseY - 75);
+      g.strokePath();
+      // Fallen rocks / rubble
+      g.fillStyle(darkerColor, 0.9);
+      g.fillCircle(15, baseY - 5, 5);
+      g.fillCircle(85, baseY - 8, 4);
+      g.fillCircle(80, baseY - 3, 3);
+      // Fire/smoke accent at top
+      g.fillStyle(0xff6600, 0.5);
+      g.fillCircle(50, baseY - 130, 4);
+      g.fillStyle(0xff9933, 0.3);
+      g.fillCircle(47, baseY - 136, 3);
+      g.fillCircle(54, baseY - 134, 3);
+    }
+  }
+
+  drawCastleBase(g, w, h, color, damageLevel) {
+    const baseY = h;
+    const darkerColor = Phaser.Display.Color.ValueToColor(color).darken(15).color;
+    const lighterColor = Phaser.Display.Color.ValueToColor(color).lighten(10).color;
+
+    // Main walls
+    g.fillStyle(color, 1);
+    g.fillRect(15, baseY - 110, 70, 110);
+
+    // Crenellations (merlons)
+    const merlonW = 10;
+    const merlonH = 12;
+    const merlonGap = 4;
+    const merlonY = baseY - 110 - merlonH;
+    let merlonX = 15;
+    const merlons = [];
+    while (merlonX + merlonW <= 85) {
+      merlons.push(merlonX);
+      g.fillStyle(color, 1);
+      if (damageLevel < 1 || merlonX < 55) {
+        g.fillRect(merlonX, merlonY, merlonW, merlonH);
+      }
+      merlonX += merlonW + merlonGap;
+    }
+
+    // Missing merlons for damage level 1+
+    if (damageLevel >= 1 && merlons.length > 3) {
+      // Leave gap where merlons were removed (already skipped above)
+      g.fillStyle(darkerColor, 0.5);
+      g.fillRect(55, merlonY + 4, merlonW, merlonH - 4);
+    }
+
+    // Gate arch
+    g.fillStyle(0x111111, 1);
+    g.fillRect(35, baseY - 45, 30, 45);
+    g.beginPath();
+    g.arc(50, baseY - 45, 15, Math.PI, 0, false);
+    g.fillPath();
+
+    // Gate outline
+    g.lineStyle(2, lighterColor, 0.7);
+    g.beginPath();
+    g.moveTo(35, baseY);
+    g.lineTo(35, baseY - 45);
+    g.arc(50, baseY - 45, 15, Math.PI, 0, false);
+    g.lineTo(65, baseY);
+    g.strokePath();
+
+    // Wall lines
+    g.lineStyle(1, darkerColor, 0.4);
+    for (let row = baseY - 100; row < baseY - 50; row += 15) {
+      g.beginPath();
+      g.moveTo(15, row);
+      g.lineTo(85, row);
+      g.strokePath();
+    }
+
+    // Vertical mortar lines (staggered)
+    for (let row = baseY - 100; row < baseY - 50; row += 15) {
+      const offset = ((row / 15) % 2 === 0) ? 0 : 10;
+      for (let col = 15 + offset; col < 85; col += 20) {
+        g.beginPath();
+        g.moveTo(col, row);
+        g.lineTo(col, row + 15);
+        g.strokePath();
+      }
+    }
+
+    if (damageLevel >= 1) {
+      // Wall cracks
+      g.lineStyle(2, 0x222222, 0.6);
+      g.beginPath();
+      g.moveTo(70, baseY - 90);
+      g.lineTo(65, baseY - 75);
+      g.lineTo(72, baseY - 60);
+      g.strokePath();
+    }
+
+    if (damageLevel >= 2) {
+      // Heavy wall cracks
+      g.lineStyle(2, 0x222222, 0.8);
+      g.beginPath();
+      g.moveTo(25, baseY - 95);
+      g.lineTo(30, baseY - 80);
+      g.lineTo(22, baseY - 60);
+      g.strokePath();
+      // Rubble pile at base
+      g.fillStyle(darkerColor, 0.8);
+      g.fillCircle(10, baseY - 4, 5);
+      g.fillCircle(90, baseY - 5, 4);
+      g.fillCircle(88, baseY - 2, 3);
+      g.fillCircle(14, baseY - 2, 3);
+      // Fire
+      g.fillStyle(0xff6600, 0.5);
+      g.fillCircle(75, baseY - 105, 4);
+      g.fillStyle(0xff9933, 0.3);
+      g.fillCircle(72, baseY - 110, 3);
+    }
+  }
+
+  drawBunkerBase(g, w, h, color, damageLevel) {
+    const baseY = h;
+    const darkerColor = Phaser.Display.Color.ValueToColor(color).darken(15).color;
+    const lighterColor = Phaser.Display.Color.ValueToColor(color).lighten(10).color;
+
+    // Main concrete slab
+    g.fillStyle(color, 1);
+    g.fillRect(10, baseY - 100, 80, 100);
+
+    // Flat roof / overhang
+    g.fillStyle(darkerColor, 1);
+    g.fillRect(5, baseY - 105, 90, 8);
+
+    // Antenna on roof
+    g.lineStyle(2, lighterColor, 0.8);
+    g.beginPath();
+    g.moveTo(70, baseY - 105);
+    g.lineTo(70, baseY - 125);
+    g.strokePath();
+    g.lineStyle(1, lighterColor, 0.6);
+    g.beginPath();
+    g.moveTo(65, baseY - 120);
+    g.lineTo(75, baseY - 120);
+    g.strokePath();
+
+    // Slit windows
+    g.fillStyle(0x111111, 1);
+    if (damageLevel < 2) {
+      g.fillRect(20, baseY - 80, 16, 5);
+      g.fillRect(64, baseY - 80, 16, 5);
+    } else {
+      // One window missing in heavy damage
+      g.fillRect(20, baseY - 80, 16, 5);
+    }
+    g.fillRect(42, baseY - 60, 16, 5);
+
+    // Door
+    g.fillStyle(0x111111, 1);
+    g.fillRect(38, baseY - 40, 24, 40);
+    // Door frame
+    g.lineStyle(2, lighterColor, 0.6);
+    g.strokeRect(38, baseY - 40, 24, 40);
+
+    // Concrete texture
+    g.lineStyle(1, darkerColor, 0.3);
+    g.beginPath();
+    g.moveTo(10, baseY - 50);
+    g.lineTo(90, baseY - 50);
+    g.strokePath();
+    g.beginPath();
+    g.moveTo(10, baseY - 25);
+    g.lineTo(38, baseY - 25);
+    g.strokePath();
+    g.beginPath();
+    g.moveTo(62, baseY - 25);
+    g.lineTo(90, baseY - 25);
+    g.strokePath();
+
+    if (damageLevel >= 1) {
+      // Cracks in walls
+      g.lineStyle(2, 0x222222, 0.7);
+      g.beginPath();
+      g.moveTo(75, baseY - 95);
+      g.lineTo(70, baseY - 80);
+      g.lineTo(78, baseY - 65);
+      g.strokePath();
+
+      // Cracked roof edge
+      g.lineStyle(1, 0x222222, 0.5);
+      g.beginPath();
+      g.moveTo(5, baseY - 100);
+      g.lineTo(12, baseY - 97);
+      g.strokePath();
+    }
+
+    if (damageLevel >= 2) {
+      // Heavy cracks
+      g.lineStyle(2, 0x222222, 0.8);
+      g.beginPath();
+      g.moveTo(20, baseY - 90);
+      g.lineTo(25, baseY - 70);
+      g.lineTo(18, baseY - 55);
+      g.strokePath();
+      // Debris
+      g.fillStyle(darkerColor, 0.8);
+      g.fillCircle(8, baseY - 3, 4);
+      g.fillCircle(92, baseY - 4, 3);
+      g.fillRect(85, baseY - 6, 6, 4);
+      // Smoke
+      g.fillStyle(0x666666, 0.3);
+      g.fillCircle(70, baseY - 128, 5);
+      g.fillCircle(68, baseY - 135, 4);
+    }
+  }
+
+  drawScifiBase(g, w, h, color, damageLevel) {
+    const baseY = h;
+    const darkerColor = Phaser.Display.Color.ValueToColor(color).darken(20).color;
+    const lighterColor = Phaser.Display.Color.ValueToColor(color).lighten(20).color;
+    const glowColor = Phaser.Display.Color.ValueToColor(color).lighten(40).color;
+
+    // Trapezoidal main structure
+    g.fillStyle(darkerColor, 1);
+    g.beginPath();
+    g.moveTo(10, baseY);
+    g.lineTo(20, baseY - 110);
+    g.lineTo(80, baseY - 110);
+    g.lineTo(90, baseY);
+    g.closePath();
+    g.fillPath();
+
+    // Inner panel
+    g.fillStyle(color, 1);
+    g.beginPath();
+    g.moveTo(15, baseY - 5);
+    g.lineTo(24, baseY - 105);
+    g.lineTo(76, baseY - 105);
+    g.lineTo(85, baseY - 5);
+    g.closePath();
+    g.fillPath();
+
+    // Antenna dish on top
+    g.lineStyle(2, lighterColor, 0.8);
+    g.beginPath();
+    g.moveTo(50, baseY - 110);
+    g.lineTo(50, baseY - 130);
+    g.strokePath();
+    g.lineStyle(1, lighterColor, 0.6);
+    g.beginPath();
+    g.arc(50, baseY - 128, 8, Math.PI * 1.1, Math.PI * 1.9, false);
+    g.strokePath();
+
+    // Glowing accent lines
+    const glowAlpha = damageLevel >= 2 ? 0.3 : 0.8;
+    g.lineStyle(2, glowColor, glowAlpha);
+
+    // Horizontal accent lines
+    g.beginPath();
+    g.moveTo(22, baseY - 90);
+    g.lineTo(78, baseY - 90);
+    g.strokePath();
+    g.beginPath();
+    g.moveTo(18, baseY - 50);
+    g.lineTo(82, baseY - 50);
+    g.strokePath();
+
+    // Vertical accent lines on edges
+    if (damageLevel < 2) {
+      g.beginPath();
+      g.moveTo(25, baseY - 100);
+      g.lineTo(16, baseY - 10);
+      g.strokePath();
+      g.beginPath();
+      g.moveTo(75, baseY - 100);
+      g.lineTo(84, baseY - 10);
+      g.strokePath();
+    } else {
+      // Broken/dashed lines for heavy damage
+      g.beginPath();
+      g.moveTo(25, baseY - 100);
+      g.lineTo(20, baseY - 70);
+      g.strokePath();
+      g.beginPath();
+      g.moveTo(18, baseY - 40);
+      g.lineTo(16, baseY - 10);
+      g.strokePath();
+    }
+
+    // Door opening
+    g.fillStyle(0x112233, 1);
+    g.fillRect(38, baseY - 40, 24, 40);
+    // Door glow frame
+    g.lineStyle(1, glowColor, glowAlpha);
+    g.strokeRect(38, baseY - 40, 24, 40);
+
+    // Window slits with glow
+    g.fillStyle(glowColor, glowAlpha * 0.6);
+    g.fillRect(28, baseY - 80, 12, 4);
+    g.fillRect(60, baseY - 80, 12, 4);
+
+    if (damageLevel >= 1) {
+      // Broken panel
+      g.lineStyle(2, 0x222222, 0.7);
+      g.beginPath();
+      g.moveTo(65, baseY - 100);
+      g.lineTo(70, baseY - 85);
+      g.lineTo(62, baseY - 70);
+      g.strokePath();
+      // Exposed inner panel
+      g.fillStyle(0x112233, 0.5);
+      g.fillTriangle(65, baseY - 100, 72, baseY - 85, 60, baseY - 75);
+    }
+
+    if (damageLevel >= 2) {
+      // More broken panels
+      g.lineStyle(2, 0x222222, 0.8);
+      g.beginPath();
+      g.moveTo(30, baseY - 95);
+      g.lineTo(35, baseY - 75);
+      g.lineTo(28, baseY - 60);
+      g.strokePath();
+      // Sparks / electrical accents
+      g.fillStyle(glowColor, 0.6);
+      g.fillCircle(68, baseY - 88, 2);
+      g.fillCircle(32, baseY - 78, 2);
+      // Debris
+      g.fillStyle(darkerColor, 0.7);
+      g.fillCircle(8, baseY - 3, 4);
+      g.fillCircle(93, baseY - 4, 3);
+    }
+  }
+
   // ── Parallax background ───────────────────────────────────
   drawBackground() {
     const viewW = 1024;
-    const viewH = 576;
+    const bg = this.ageConfig.background;
 
     // Layer 1 — Sky gradient (scrollFactor 0, fixed)
     const skyG = this.add.graphics();
@@ -327,10 +856,9 @@ export class GameScene extends Phaser.Scene {
     const bandH = GROUND_Y / bands;
     for (let i = 0; i < bands; i++) {
       const t = i / (bands - 1);
-      // Lerp from light blue (top) to pale white-blue (horizon)
-      const r = Math.round(135 + (230 - 135) * t);
-      const g = Math.round(206 + (240 - 206) * t);
-      const b = Math.round(235 + (255 - 235) * t);
+      const r = Math.round(bg.skyTopR + (bg.skyBotR - bg.skyTopR) * t);
+      const g = Math.round(bg.skyTopG + (bg.skyBotG - bg.skyTopG) * t);
+      const b = Math.round(bg.skyTopB + (bg.skyBotB - bg.skyTopB) * t);
       const color = (r << 16) | (g << 8) | b;
       skyG.fillStyle(color, 1);
       skyG.fillRect(0, i * bandH, viewW, bandH + 1);
@@ -351,12 +879,12 @@ export class GameScene extends Phaser.Scene {
       { x: 200, y: 110, s: 0.6 },
     ];
     clouds.forEach((c) => {
-      cloudG.fillStyle(0xffffff, 0.6);
+      cloudG.fillStyle(bg.cloudColor, bg.cloudAlpha);
       cloudG.fillCircle(c.x, c.y, 24 * c.s);
       cloudG.fillCircle(c.x + 20 * c.s, c.y - 5, 20 * c.s);
       cloudG.fillCircle(c.x - 18 * c.s, c.y + 2, 18 * c.s);
       cloudG.fillCircle(c.x + 10 * c.s, c.y + 8, 16 * c.s);
-      cloudG.fillStyle(0xeeeeee, 0.4);
+      cloudG.fillStyle(bg.cloudColor, bg.cloudAlpha * 0.7);
       cloudG.fillCircle(c.x + 30 * c.s, c.y + 4, 14 * c.s);
       cloudG.fillCircle(c.x - 28 * c.s, c.y + 6, 12 * c.s);
     });
@@ -364,10 +892,10 @@ export class GameScene extends Phaser.Scene {
     cloudG.destroy();
     this.add.image(cloudW / 2, 75, 'bg_clouds').setScrollFactor(0.1).setDepth(1);
 
-    // Layer 3 — Far mountains (scrollFactor 0.2, blue-grey)
+    // Layer 3 — Far mountains (scrollFactor 0.2)
     const farMtnW = Math.ceil(viewW + (GAME_W - viewW) * 0.2);
     const farG = this.add.graphics();
-    farG.fillStyle(0x7090aa, 1);
+    farG.fillStyle(bg.farMtnColor, 1);
     const farPeaks = [
       [0, GROUND_Y, 100, GROUND_Y - 160, 250, GROUND_Y],
       [200, GROUND_Y, 350, GROUND_Y - 200, 520, GROUND_Y],
@@ -381,7 +909,7 @@ export class GameScene extends Phaser.Scene {
       farG.fillTriangle(x1, y1, x2, y2, x3, y3);
     });
     // Snow caps on taller peaks
-    farG.fillStyle(0xddeeff, 0.7);
+    farG.fillStyle(bg.snowCapColor, 0.7);
     farPeaks.forEach(([x1, y1, x2, y2, x3, y3]) => {
       const peakH = y1 - y2;
       if (peakH > 150) {
@@ -394,10 +922,10 @@ export class GameScene extends Phaser.Scene {
     farG.destroy();
     this.add.image(farMtnW / 2, GROUND_Y / 2, 'bg_far_mtn').setScrollFactor(0.2).setDepth(2);
 
-    // Layer 4 — Near mountains (scrollFactor 0.4, darker)
+    // Layer 4 — Near mountains (scrollFactor 0.4)
     const nearMtnW = Math.ceil(viewW + (GAME_W - viewW) * 0.4);
     const nearG = this.add.graphics();
-    nearG.fillStyle(0x506848, 1);
+    nearG.fillStyle(bg.nearMtnColor, 1);
     const nearPeaks = [
       [0, GROUND_Y, 80, GROUND_Y - 100, 200, GROUND_Y],
       [150, GROUND_Y, 300, GROUND_Y - 130, 430, GROUND_Y],
@@ -428,10 +956,10 @@ export class GameScene extends Phaser.Scene {
       const trunkH = 10 + Math.random() * 8;
       const baseY = GROUND_Y;
       // Trunk
-      treeG.fillStyle(0x5a3a1a, 1);
+      treeG.fillStyle(bg.trunkColor, 1);
       treeG.fillRect(tx - 2, baseY - trunkH, 4, trunkH);
       // Canopy (triangle)
-      treeG.fillStyle(0x2d5a1e, 1);
+      treeG.fillStyle(bg.canopyColor, 1);
       treeG.fillTriangle(
         tx - 10 - Math.random() * 5, baseY - trunkH,
         tx, baseY - trunkH - treeH,
@@ -904,7 +1432,7 @@ export class GameScene extends Phaser.Scene {
   spawnEnemy() {
     if (this.gameOver) return;
 
-    const affordable = UNIT_TYPES.filter((t) => t.cost <= this.enemyGold);
+    const affordable = this.unitTypes.filter((t) => t.cost <= this.enemyGold);
     if (affordable.length === 0) return;
 
     const type = Phaser.Utils.Array.GetRandom(affordable);
@@ -1132,15 +1660,29 @@ export class GameScene extends Phaser.Scene {
     this.warriors.getChildren().forEach((w) => {
       if (!w.active) return;
       const dotX = mm.x + (w.x / GAME_W) * mm.w;
-      this.minimapGfx.fillStyle(0x33cc33, 1);
+      this.minimapGfx.fillStyle(this.ageConfig.baseColors.player, 1);
       this.minimapGfx.fillCircle(dotX, mm.y + mm.h / 2, 2);
     });
     this.enemies.getChildren().forEach((e) => {
       if (!e.active) return;
       const dotX = mm.x + (e.x / GAME_W) * mm.w;
-      this.minimapGfx.fillStyle(0xff4444, 1);
+      this.minimapGfx.fillStyle(this.ageConfig.baseColors.enemy, 1);
       this.minimapGfx.fillCircle(dotX, mm.y + mm.h / 2, 2);
     });
+
+    // ── Base damage stage transitions ─────────────────────────
+    const pStage = this.playerBaseHP > this.maxPlayerBaseHP * 0.66 ? 0
+                 : this.playerBaseHP > this.maxPlayerBaseHP * 0.33 ? 1 : 2;
+    if (pStage !== this.playerBaseStage) {
+      this.playerBaseStage = pStage;
+      this.playerBase.setTexture(`base_player_${pStage}`);
+    }
+    const eStage = this.enemyBaseHP > this.maxEnemyBaseHP * 0.66 ? 0
+                 : this.enemyBaseHP > this.maxEnemyBaseHP * 0.33 ? 1 : 2;
+    if (eStage !== this.enemyBaseStage) {
+      this.enemyBaseStage = eStage;
+      this.enemyBase.setTexture(`base_enemy_${eStage}`);
+    }
   }
 
   // ── Helpers ─────────────────────────────────────────────────
@@ -1409,8 +1951,8 @@ export class GameScene extends Phaser.Scene {
     this.sfx.healEffect();
     this.cameras.main.flash(300, 100, 255, 100);
 
-    const healed = Math.min(100, BASE_HP - this.playerBaseHP);
-    this.playerBaseHP = Math.min(BASE_HP, this.playerBaseHP + 100);
+    const healed = Math.min(100, this.maxPlayerBaseHP - this.playerBaseHP);
+    this.playerBaseHP = Math.min(this.maxPlayerBaseHP, this.playerBaseHP + 100);
     this.playerHPText.setText(`HP: ${Math.ceil(this.playerBaseHP)}`);
     if (healed > 0) {
       this.showDamageNumber(this.playerBase.x, this.playerBase.y - 60, healed, '#44ff44');
@@ -1470,16 +2012,33 @@ export class GameScene extends Phaser.Scene {
       e.setTexture(textureKey(e.unitTypeName, e.faction, 'idle'));
     });
 
-    this.add.text(512, 200, message, {
-      fontSize: '48px',
-      color: message === 'You Win!' ? '#00ff00' : '#ff0000',
-      fontStyle: 'bold',
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(20);
+    // Save progress on win
+    if (message === 'You Win!') {
+      const progress = loadProgress();
+      const newUnlocked = Math.max(progress.unlockedAge, this.ageIndex + 1);
+      saveProgress({ unlockedAge: Math.min(newUnlocked, AGES.length - 1) });
 
-    this.add.text(512, 260, 'Click to return to menu', {
+      this.add.text(512, 200, 'Age Complete!', {
+        fontSize: '48px', color: '#00ff00', fontStyle: 'bold',
+        stroke: '#000000', strokeThickness: 4,
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(20);
+
+      if (this.ageIndex + 1 < AGES.length) {
+        this.add.text(512, 250, `${AGES[this.ageIndex + 1].name} Unlocked!`, {
+          fontSize: '24px', color: '#ffd700', fontStyle: 'bold',
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(20);
+      }
+    } else {
+      this.add.text(512, 200, message, {
+        fontSize: '48px', color: '#ff0000', fontStyle: 'bold',
+        stroke: '#000000', strokeThickness: 4,
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(20);
+    }
+
+    this.add.text(512, 300, 'Click to continue', {
       fontSize: '20px', color: '#ffffff',
     }).setOrigin(0.5).setScrollFactor(0).setDepth(20);
 
-    this.input.once('pointerdown', () => this.scene.start('MenuScene'));
+    this.input.once('pointerdown', () => this.scene.start('LevelSelectScene'));
   }
 }
